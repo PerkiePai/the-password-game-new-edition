@@ -21,6 +21,7 @@
         <button id="loginBtn" class="btn ghost">Login</button>
         <div id="userPanel" class="user-panel hidden">
           <span id="userBadge"></span>
+          <button id="historyBtn" class="btn ghost sm" title="Account history">History</button>
           <button id="logoutBtn" class="btn ghost sm" title="Logout">Logout</button>
         </div>
       </div>
@@ -46,7 +47,7 @@
           <ul class="bullets">
             <li>30 second timer refreshes every time Gemini approves your password.</li>
             <li>Tap <strong>Check</strong> whenever you want a fresh evaluation.</li>
-            <li>Duplicate categories automatically refresh with brand-new twists.</li>
+            <li>Duplicate categories stack up, turning simple prompts into brutal combos.</li>
           </ul>
 
           <div class="hero-stats">
@@ -110,7 +111,7 @@
             <div class="panel rules-panel">
               <div class="panel-head">
                 <h3>Active Rules</h3>
-                <span class="subtext">Re-roll on duplicates</span>
+                <span class="subtext">Stacking categories welcome</span>
               </div>
               <div id="rulesList" class="rules-list"></div>
             </div>
@@ -195,6 +196,25 @@
       <div id="leaderboardError" class="leaderboard-status hidden"></div>
       <div id="leaderboardEmpty" class="leaderboard-status hidden">No runs yet. Be the first!</div>
       <div id="leaderboardList" class="leaderboard-list"></div>
+    </div>
+  </div>
+
+  <div id="historyModal" class="modal hidden" role="dialog" aria-modal="true">
+    <div class="modal-box leaderboard-card">
+      <div class="modal-head">
+        <div>
+          <p class="eyebrow">Personal Stats</p>
+          <h3>Run History</h3>
+        </div>
+        <div class="modal-head-actions">
+          <button id="historyRefreshBtn" class="btn ghost sm">Refresh</button>
+          <button id="historyCloseBtn" class="close ghost-circle" aria-label="Close history">×</button>
+        </div>
+      </div>
+      <div id="historySpinner" class="leaderboard-status">Loading history…</div>
+      <div id="historyError" class="leaderboard-status hidden"></div>
+      <div id="historyEmpty" class="leaderboard-status hidden">No runs yet. Play a round!</div>
+      <div id="historyList" class="leaderboard-list"></div>
     </div>
   </div>
 

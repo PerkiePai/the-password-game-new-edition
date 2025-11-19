@@ -56,3 +56,23 @@ export async function apiListRuns({ username, limit } = {}) {
   const r = await fetch(`${BASE_URL}/runs${qs ? `?${qs}` : ""}`);
   return jsonOrThrow(r);
 }
+
+export async function apiDeleteRun(id) {
+  if (!id) throw new Error("Missing run id");
+  const headers = authHeader();
+  if (!headers.Authorization) {
+    throw new Error("Login required");
+  }
+
+  const r = await fetch(`${BASE_URL}/runs/${id}`, {
+    method: "DELETE",
+    headers,
+  });
+
+  if (r.status === 204) return true;
+  if (!r.ok) {
+    const message = await r.text();
+    throw new Error(message || "Unable to delete run");
+  }
+  return true;
+}

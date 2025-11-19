@@ -1,5 +1,5 @@
 import { hookAuthUI } from "./auth.js";
-import { apiSaveResult, apiCheckRules, apiListRuns } from "./api.js";
+import { apiSaveResult, apiCheckRules, apiListRuns, apiDeleteRun } from "./api.js";
 import { USER_KEY, LVL_KEY, TOKEN_KEY } from "./config.js";
 
 const pages = {
@@ -32,6 +32,14 @@ const els = {
   leaderboardSpinner: document.getElementById("leaderboardSpinner"),
   leaderboardRefresh: document.getElementById("leaderboardRefreshBtn"),
   leaderboardClose: document.getElementById("leaderboardCloseBtn"),
+  historyBtn: document.getElementById("historyBtn"),
+  historyModal: document.getElementById("historyModal"),
+  historyList: document.getElementById("historyList"),
+  historyEmpty: document.getElementById("historyEmpty"),
+  historyError: document.getElementById("historyError"),
+  historySpinner: document.getElementById("historySpinner"),
+  historyRefresh: document.getElementById("historyRefreshBtn"),
+  historyClose: document.getElementById("historyCloseBtn"),
   quitBtn: document.getElementById("quitBtn"),
   resultsPanel: document.querySelector(".results-panel"),
 };
@@ -50,6 +58,10 @@ let lastRuleSignature = null;
 let leaderboardRuns = [];
 let leaderboardBusy = false;
 let leaderboardLoaded = false;
+let historyRuns = [];
+let historyBusy = false;
+let historyLoaded = false;
+let historyUsername = null;
 
 const loginBtn = document.getElementById("loginBtn");
 const userPanel = document.getElementById("userPanel");
@@ -65,6 +77,8 @@ function show(page) {
   if (isGame) {
     loginBtn.classList.add("hidden");
     userPanel.classList.add("hidden");
+    closeLeaderboardModal();
+    closeHistoryModal();
   } else {
     authUI.showBadge();
   }
@@ -326,6 +340,7 @@ async function loadLeaderboard(force = false) {
 
 function openLeaderboardModal() {
   if (els.leaderboardBtn.classList.contains("hidden")) return;
+  closeHistoryModal();
   els.leaderboardModal.classList.remove("hidden");
   document.body.classList.add("modal-open");
   loadLeaderboard(true);
@@ -333,7 +348,172 @@ function openLeaderboardModal() {
 
 function closeLeaderboardModal() {
   els.leaderboardModal.classList.add("hidden");
-  document.body.classList.remove("modal-open");
+  syncModalOpenState();
+}
+
+function syncModalOpenState() {
+  if (
+    els.leaderboardModal.classList.contains("hidden") &&
+    els.historyModal.classList.contains("hidden")
+  ) {
+    document.body.classList.remove("modal-open");
+  }
+}
+
+function hideHistoryMessages() {
+  els.historySpinner.classList.add("hidden");
+  els.historyError.classList.add("hidden");
+  els.historyEmpty.classList.add("hidden");
+}
+
+function renderHistory(runs = []) {
+  hideHistoryMessages();
+  els.historyList.innerHTML = "";
+  if (!runs.length) {
+    els.historyEmpty.classList.remove("hidden");
+    return;
+  }
+
+  const fragment = document.createDocumentFragment();
+  runs.forEach((run, idx) => {
+    const row = document.createElement("div");
+    row.className = "leaderboard-row";
+    row.dataset.rank = String(idx + 1);
+    const matchId = run._id || run.id;
+    if (matchId) {
+      row.dataset.matchId = String(matchId);
+    }
+
+    const rank = document.createElement("div");
+    rank.className = "leaderboard-rank";
+    rank.textContent = `#${idx + 1}`;
+
+    const body = document.createElement("div");
+    body.className = "leaderboard-body";
+
+    const header = document.createElement("div");
+    header.className = "leaderboard-user";
+    header.textContent = run.username || "Anonymous";
+
+    const meta = document.createElement("div");
+    meta.className = "leaderboard-meta";
+    const levelTag = document.createElement("span");
+    levelTag.textContent = `Lv ${run.level ?? 0}`;
+    const avgTag = document.createElement("span");
+    avgTag.textContent = `Avg ${formatSeconds(run.avgTime)}`;
+    const totalTag = document.createElement("span");
+    totalTag.textContent = `Total ${formatSeconds(run.totalTime)}`;
+    const timeTag = document.createElement("span");
+    timeTag.textContent = formatTimestamp(run.playedAt);
+    meta.append(levelTag, avgTag, totalTag, timeTag);
+
+    const pwd = document.createElement("div");
+    pwd.className = "leaderboard-password";
+    pwd.textContent = `Last: ${run.lastPassword || "—"}`;
+
+    const actions = document.createElement("div");
+    actions.className = "history-actions";
+    if (matchId) {
+      const deleteBtn = document.createElement("button");
+      deleteBtn.type = "button";
+      deleteBtn.className = "btn ghost sm danger history-delete";
+      deleteBtn.dataset.id = String(matchId);
+      deleteBtn.textContent = "Delete";
+      actions.appendChild(deleteBtn);
+    }
+
+    body.append(header, meta, pwd, actions);
+    row.append(rank, body);
+    fragment.appendChild(row);
+  });
+
+  els.historyList.appendChild(fragment);
+}
+
+function showHistoryLoading(message = "Loading history…") {
+  els.historySpinner.textContent = message;
+  els.historySpinner.classList.remove("hidden");
+  els.historyError.classList.add("hidden");
+  els.historyEmpty.classList.add("hidden");
+}
+
+function showHistoryError(message) {
+  els.historyError.textContent = message;
+  els.historyError.classList.remove("hidden");
+  els.historySpinner.classList.add("hidden");
+  els.historyEmpty.classList.add("hidden");
+}
+
+async function loadHistory(force = false) {
+  if (historyBusy) return;
+  const username = localStorage.getItem(USER_KEY);
+  if (!username) {
+    showHistoryError("Login to view your history.");
+    return;
+  }
+
+  if (username !== historyUsername) {
+    historyUsername = username;
+    historyRuns = [];
+    historyLoaded = false;
+  }
+
+  if (!force && historyLoaded && historyRuns.length) {
+    renderHistory(historyRuns);
+    return;
+  }
+
+  historyBusy = true;
+  showHistoryLoading();
+  try {
+    const runs = await apiListRuns({ username, limit: 50 });
+    historyRuns = runs;
+    historyLoaded = true;
+    renderHistory(runs);
+  } catch (err) {
+    console.error("Failed to load history", err);
+    showHistoryError(err?.message || "Unable to load history right now.");
+  } finally {
+    historyBusy = false;
+  }
+}
+
+function openHistoryModal() {
+  if (!els.historyBtn) return;
+  closeLeaderboardModal();
+  els.historyModal.classList.remove("hidden");
+  document.body.classList.add("modal-open");
+  loadHistory(true);
+}
+
+function closeHistoryModal() {
+  els.historyModal.classList.add("hidden");
+  syncModalOpenState();
+}
+
+async function deleteHistoryEntry(matchId, triggerBtn) {
+  if (!matchId) return;
+  if (!window.confirm("Delete this match from your history?")) return;
+
+  const btn = triggerBtn;
+  const originalText = btn?.textContent;
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = "Deleting…";
+  }
+
+  try {
+    await apiDeleteRun(matchId);
+    await loadHistory(true);
+  } catch (err) {
+    console.error("Failed to delete history entry", err);
+    alert(err?.message || "Unable to delete this match.");
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = originalText || "Delete";
+    }
+  }
 }
 
 function updateStatusChip(status) {
@@ -549,8 +729,54 @@ els.leaderboardModal.addEventListener("click", (e) => {
   }
 });
 
+if (els.historyBtn) {
+  els.historyBtn.addEventListener("click", () => {
+    openHistoryModal();
+  });
+}
+
+if (els.historyClose) {
+  els.historyClose.addEventListener("click", () => {
+    closeHistoryModal();
+  });
+}
+
+if (els.historyRefresh) {
+  els.historyRefresh.addEventListener("click", () => {
+    loadHistory(true);
+  });
+}
+
+if (els.historyModal) {
+  els.historyModal.addEventListener("click", (e) => {
+    if (e.target === els.historyModal) {
+      closeHistoryModal();
+    }
+  });
+}
+
+if (els.historyList) {
+  els.historyList.addEventListener("click", (e) => {
+    const btn = e.target.closest(".history-delete");
+    if (!btn) return;
+    const matchId = btn.dataset.id;
+    if (!matchId || btn.disabled) return;
+    deleteHistoryEntry(matchId, btn);
+  });
+}
+
 document.addEventListener("keydown", (e) => {
-  if (e.key === "Escape" && !els.leaderboardModal.classList.contains("hidden")) {
+  if (e.key !== "Escape") return;
+  let handled = false;
+  if (!els.leaderboardModal.classList.contains("hidden")) {
     closeLeaderboardModal();
+    handled = true;
+  }
+  if (!els.historyModal.classList.contains("hidden")) {
+    closeHistoryModal();
+    handled = true;
+  }
+  if (handled) {
+    e.preventDefault();
   }
 });

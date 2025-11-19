@@ -1,4 +1,4 @@
-import MatchHistory from "../models/matchHistoryModel.js";
+import History from "../models/historyModel.js";
 import User from "../models/userModel.js";
 
 export async function saveResult(req, res) {
@@ -14,14 +14,22 @@ export async function saveResult(req, res) {
 
   const username = req.user.username;
 
-  await MatchHistory.create({
-    username,
-    totalTime,
-    avgTime,
-    level,
-    lastPassword,
-    rulesUsed: Array.isArray(rules) ? rules : [],
-  });
+  await History.findOneAndUpdate(
+    { username },
+    {
+      $setOnInsert: { username },
+      $push: {
+        matches: {
+          password: lastPassword,
+          totalTime,
+          avgTime,
+          level,
+          playedAt: new Date(),
+        },
+      },
+    },
+    { upsert: true }
+  );
 
   const updatedUser = await User.findByIdAndUpdate(
     req.user._id,

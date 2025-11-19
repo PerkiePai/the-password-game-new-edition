@@ -1,4 +1,4 @@
-import MatchHistory from "../models/matchHistoryModel.js";
+import History from "../models/historyModel.js";
 
 function sanitizeNumber(value, min = 0) {
   const num = Number(value);
@@ -6,37 +6,54 @@ function sanitizeNumber(value, min = 0) {
   return Math.max(min, num);
 }
 
+function serializeRun(username, match) {
+  if (!match) return null;
+  const plain = match.toObject ? match.toObject() : match;
+  return {
+    ...plain,
+    lastPassword: plain.lastPassword ?? plain.password,
+    username,
+  };
+}
+
 export async function listRuns(req, res) {
   const { username, limit = 20 } = req.query;
-  const query = {};
-  if (username) {
-    query.username = username.trim();
-  }
-
   const safeLimit = Math.min(Math.max(Number(limit) || 20, 1), 100);
 
-  // When username filter is provided we return the raw history for that user.
   if (username) {
-    const runs = await MatchHistory.find(query)
-      .sort({ playedAt: -1 })
-      .limit(safeLimit)
-      .lean();
+    const record = await History.findOne({ username: username.trim() }).lean();
+    if (!record || !record.matches?.length) {
+      return res.json([]);
+    }
+
+    const runs = [...record.matches]
+      .sort((a, b) => {
+        const timeA = new Date(a.playedAt).getTime();
+        const timeB = new Date(b.playedAt).getTime();
+        return timeB - timeA;
+      })
+      .slice(0, safeLimit)
+      .map((match) => ({
+        ...match,
+        username: record.username,
+        lastPassword: match.lastPassword ?? match.password,
+      }));
+
     return res.json(runs);
   }
 
-  // Otherwise build a leaderboard with unique players and their best run.
-  const leaderboard = await MatchHistory.aggregate([
-    { $match: query },
-    { $sort: { level: -1, totalTime: 1, playedAt: 1 } },
+  const leaderboard = await History.aggregate([
+    { $unwind: "$matches" },
+    { $sort: { "matches.level": -1, "matches.totalTime": 1, "matches.playedAt": 1 } },
     {
       $group: {
         _id: "$username",
         username: { $first: "$username" },
-        level: { $first: "$level" },
-        avgTime: { $first: "$avgTime" },
-        totalTime: { $first: "$totalTime" },
-        lastPassword: { $first: "$lastPassword" },
-        playedAt: { $first: "$playedAt" },
+        level: { $first: "$matches.level" },
+        avgTime: { $first: "$matches.avgTime" },
+        totalTime: { $first: "$matches.totalTime" },
+        lastPassword: { $first: "$matches.password" },
+        playedAt: { $first: "$matches.playedAt" },
       },
     },
     { $sort: { level: -1, avgTime: 1 } },
@@ -47,11 +64,15 @@ export async function listRuns(req, res) {
 }
 
 export async function getRun(req, res) {
-  const run = await MatchHistory.findById(req.params.id);
+  const history = await History.findOne(
+    { "matches._id": req.params.id },
+    { username: 1, matches: { $elemMatch: { _id: req.params.id } } }
+  ).lean();
+  const run = history?.matches?.[0];
   if (!run) {
     return res.status(404).json({ message: "Run not found" });
   }
-  res.json(run);
+  res.json(serializeRun(history.username, run));
 }
 
 export async function createRun(req, res) {
@@ -69,72 +90,88 @@ export async function createRun(req, res) {
     return res.status(400).json({ message: "Invalid run payload" });
   }
 
-  const run = await MatchHistory.create({
-    username: req.user.username,
+  const matchEntry = {
+    password: lastPassword,
     totalTime,
     avgTime,
     level,
-    lastPassword,
-    rulesUsed: Array.isArray(req.body.rulesUsed) ? req.body.rulesUsed : [],
-  });
+    playedAt: new Date(),
+  };
 
-  res.status(201).json(run);
+  const history = await History.findOneAndUpdate(
+    { username: req.user.username },
+    {
+      $setOnInsert: { username: req.user.username },
+      $push: { matches: matchEntry },
+    },
+    { new: true, upsert: true }
+  );
+  const run = history.matches[history.matches.length - 1];
+
+  res.status(201).json(serializeRun(req.user.username, run));
 }
 
 export async function updateRun(req, res) {
-  const run = await MatchHistory.findById(req.params.id);
-  if (!run) {
-    return res.status(404).json({ message: "Run not found" });
-  }
-  if (run.username !== req.user.username) {
-    return res.status(403).json({ message: "Cannot modify another user's run" });
-  }
-
   const updates = {};
   if (req.body.totalTime !== undefined) {
     const totalTime = sanitizeNumber(req.body.totalTime);
     if (totalTime === null) {
       return res.status(400).json({ message: "totalTime must be numeric" });
     }
-    updates.totalTime = totalTime;
+    updates["matches.$.totalTime"] = totalTime;
   }
   if (req.body.avgTime !== undefined) {
     const avgTime = sanitizeNumber(req.body.avgTime);
     if (avgTime === null) {
       return res.status(400).json({ message: "avgTime must be numeric" });
     }
-    updates.avgTime = avgTime;
+    updates["matches.$.avgTime"] = avgTime;
   }
   if (req.body.level !== undefined) {
     const level = sanitizeNumber(req.body.level);
     if (level === null) {
       return res.status(400).json({ message: "level must be numeric" });
     }
-    updates.level = level;
+    updates["matches.$.level"] = level;
   }
   if (req.body.lastPassword !== undefined) {
     const pwd = (req.body.lastPassword || "").toString().slice(0, 256);
     if (!pwd.trim()) {
       return res.status(400).json({ message: "lastPassword cannot be empty" });
     }
-    updates.lastPassword = pwd;
+    updates["matches.$.password"] = pwd;
+  }
+  if (!Object.keys(updates).length) {
+    return res.status(400).json({ message: "No valid fields to update" });
   }
 
-  Object.assign(run, updates);
-  await run.save();
+  const history = await History.findOneAndUpdate(
+    { username: req.user.username, "matches._id": req.params.id },
+    { $set: updates },
+    { new: true }
+  );
+  if (!history) {
+    return res.status(404).json({ message: "Run not found" });
+  }
+  const run = history.matches.find((match) => match._id.toString() === req.params.id);
 
-  res.json(run);
+  res.json(serializeRun(history.username, run));
 }
 
 export async function deleteRun(req, res) {
-  const run = await MatchHistory.findById(req.params.id);
-  if (!run) {
+  const history = await History.findOne({ username: req.user.username });
+  if (!history) {
     return res.status(404).json({ message: "Run not found" });
   }
-  if (run.username !== req.user.username) {
-    return res.status(403).json({ message: "Cannot delete another user's run" });
+  const idx = history.matches.findIndex(
+    (match) => match._id.toString() === req.params.id
+  );
+  if (idx === -1) {
+    return res.status(404).json({ message: "Run not found" });
   }
 
-  await run.deleteOne();
+  history.matches.splice(idx, 1);
+  await history.save();
+
   res.status(204).end();
 }
