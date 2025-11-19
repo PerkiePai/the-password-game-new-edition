@@ -1,52 +1,58 @@
-import { BACKEND_URL } from "./config.js";
+import { BASE_URL, TOKEN_KEY } from "./config.js";
 
-export async function getItems() {
-  const items = await fetch(`${BACKEND_URL}/items`).then((r) => r.json());
+const authHeader = () => {
+  const t = localStorage.getItem(TOKEN_KEY);
+  return t ? { Authorization: `Bearer ${t}` } : {};
+};
 
-  return items;
-}
+const jsonOrThrow = async (response) => {
+  if (!response.ok) {
+    const message = await response.text();
+    throw new Error(message || "Request failed");
+  }
+  return response.json();
+};
 
-export async function createItem(item) {
-  await fetch(`${BACKEND_URL}/items`, {
+export async function apiLogin(username) {
+  const r = await fetch(`${BASE_URL}/auth/login`, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(item),
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ username }),
   });
+  return jsonOrThrow(r);
 }
 
-export async function editItem(id, item) {
-  await fetch(`${BACKEND_URL}/items/${id}`, {
-    method: "PUT",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(item),
+export async function apiVerify() {
+  const r = await fetch(`${BASE_URL}/auth/verify`, { headers: authHeader() });
+  if (r.status === 401) return null;
+  return jsonOrThrow(r);
+}
+
+export async function apiSaveResult(payload) {
+  const headers = { "Content-Type": "application/json", ...authHeader() };
+  const r = await fetch(`${BASE_URL}/game/save`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify(payload),
   });
+  if (r.status === 401) return null;
+  return jsonOrThrow(r);
 }
 
-export async function deleteItem(id) {
-  await fetch(`${BACKEND_URL}/items/${id}`, {
-    method: "DELETE",
+export async function apiCheckRules(payload) {
+  const r = await fetch(`${BASE_URL}/rules/check`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
   });
+  return jsonOrThrow(r);
 }
 
-export async function filterItems(filterName, lowerPrice, upperPrice) {
-  // TODO3: implement this function
-  // You may need to understand handleFilterItem() function in ./table.js before implementing this function.
-  return /* return the filted items */;
-}
-
-export async function getMembers() {
-  // TODO4: implement this function
-  return /* return all members */;
-}
-
-export async function createMember(member) {
-  // TODO4: implement this function
-}
-
-export async function deleteMember(id, item) {
-  // TODO4: implement this function
+export async function apiListRuns({ username, limit } = {}) {
+  const params = new URLSearchParams();
+  if (username) params.set("username", username);
+  if (limit) params.set("limit", limit);
+  const qs = params.toString();
+  const r = await fetch(`${BASE_URL}/runs${qs ? `?${qs}` : ""}`);
+  return jsonOrThrow(r);
 }

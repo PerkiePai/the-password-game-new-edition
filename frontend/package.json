@@ -8,6 +8,7 @@
     "start": "node --watch server.js"
   },
   "dependencies": {
+    "@google/genai": "^1.29.1",
     "express": "^5.1.0"
   },
   "devDependencies": {

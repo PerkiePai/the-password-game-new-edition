@@ -1,59 +1,203 @@
-<!DOCTYPE html>
-<html>
-  <head>
-    <meta charset="UTF-8" />
-    <title>ฝากซื้อด้วย</title>
-    <link rel="stylesheet" href="style.css" />
-  </head>
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>PasswordGame</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link href="./style.css" rel="stylesheet" />
+</head>
+<body>
+  <div class="bg-decoration" aria-hidden="true">
+    <div class="orb orb-one"></div>
+    <div class="orb orb-two"></div>
+    <div class="grid-overlay"></div>
+  </div>
 
-  <body>
-    <section>
-      <header><h1 id="app-name">ฝากซื้อด้วย</h1></header>
-    </section>
+  <div class="app-shell">
+    <header class="topbar">
+      <div class="brand">PasswordGame</div>
+      <div class="auth">
+        <button id="leaderboardBtn" class="btn ghost sm">Leaderboard</button>
+        <button id="loginBtn" class="btn ghost">Login</button>
+        <div id="userPanel" class="user-panel hidden">
+          <span id="userBadge"></span>
+          <button id="logoutBtn" class="btn ghost sm" title="Logout">Logout</button>
+        </div>
+      </div>
+    </header>
 
-    <section>
-      <header>
-        <h2 class="section-title">รายชื่อผู้มีสิทธิฝากซื้อ</h2>
-        <span class="section-subtitle">(ชื่อคนในกลุ่มที่มาร่วมทำวันนี้)</span>
-      </header>
-      <ul id="member-list"></ul>
-      <input id="member-name-to-add" />
-      <button id="add-member">จ้าง</button>
+    <main>
+      <!-- START -->
+      <section id="startPage" class="page visible">
+        <div class="center-wrapper">
+          <div class="center-card hero-card">
+            <h1>Crack the Impossible Password</h1>
+            <p class="lead">Stack rules from six wild categories and keep one password alive long enough to climb the leaderboard.</p>
 
-      <h2 class="section-title">ตัวกรองรายการฝากซื้อ</h2>
-      <select id="filter-name"></select>
-      <input id="lower-price" type="number" placeholder="$ MIN"/>
-      <input id="upper-price" type="number" placeholder="$ MAX"/>
-      <button id="filter-button">กรอง</button>
-    </section>
+          <div class="chip-row" aria-hidden="true">
+            <span class="chip">Word</span>
+            <span class="chip">Number</span>
+            <span class="chip">Roman</span>
+            <span class="chip">Special</span>
+            <span class="chip">Globe</span>
+            <span class="chip">Letter</span>
+          </div>
 
-    <section>
-      <header><h2 class="section-title">รายการฝากซื้อ</h2></header>
-      <table id="main-table">
-        <thead>
-          <tr>
-            <th>ของที่ฝากซื้อ</th>
-            <th>ชื่อผู้ฝากซื้อ</th>
-            <th>ราคา (บาท)</th>
-            <th>ดำเนินการ</th>
-          </tr>
-        </thead>
+          <ul class="bullets">
+            <li>30 second timer refreshes every time Gemini approves your password.</li>
+            <li>Tap <strong>Check</strong> whenever you want a fresh evaluation.</li>
+            <li>Duplicate categories automatically refresh with brand-new twists.</li>
+          </ul>
 
-        <tbody id="main-table-body"></tbody>
+          <div class="hero-stats">
+            <div class="stat-card">
+              <span class="stat-label">Timer boost</span>
+              <strong>+30s</strong>
+              <small>For every cleared level</small>
+            </div>
+            <div class="stat-card">
+              <span class="stat-label">Rule deck</span>
+              <strong>6 types</strong>
+              <small>rotating chaos</small>
+            </div>
+            <div class="stat-card">
+              <span class="stat-label">Tracking</span>
+              <strong>Cloud sync</strong>
+              <small>keep your crown</small>
+            </div>
+          </div>
 
-        <tfoot>
-          <tr id="newrow-form">
-            <td><input id="item-to-add" type="text" /></td>
-            <td>
-              <select id="name-to-add"></select>
-            </td>
-            <td><input id="price-to-add" type="number" /></td>
-            <td><button id="add-newrow">เพิ่ม</button></td>
-          </tr>
-        </tfoot>
-      </table>
-    </section>
+            <button id="startBtn" class="btn primary hero-btn">Start Run</button>
+          </div>
+        </div>
+      </section>
 
-    <script type="module" src="scripts/main.js"></script>
-  </body>
+      <!-- GAME -->
+      <section id="gamePage" class="page">
+        <div class="hud">
+          <div class="level">Level <span id="levelVal">1</span></div>
+          <div class="hud-controls">
+            <button id="quitBtn" class="btn ghost sm danger">Quit</button>
+            <div class="timer"><span id="timeLeft">30</span>s</div>
+          </div>
+        </div>
+
+        <div class="game-shell">
+          <div class="primary-column">
+            <div class="panel input-panel">
+              <label class="label">Your Password</label>
+              <input id="pwdInput" type="text" class="input" placeholder="Type here..." autofocus />
+              <div class="hint">Length: <span id="lenVal">0</span></div>
+              <div class="actions-row">
+                <button id="checkBtn" class="btn primary wide">Check</button>
+                <div class="status-line">
+                  Last check:
+                  <span id="checkStatus" class="status-chip">—</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="panel results-panel">
+              <div class="panel-head">
+                <h3>Latest Evaluation</h3>
+                <span class="subtext">Powered by Gemini</span>
+              </div>
+              <div id="resultsList" class="results-list"></div>
+            </div>
+          </div>
+
+          <aside class="sidebar">
+            <div class="panel rules-panel">
+              <div class="panel-head">
+                <h3>Active Rules</h3>
+                <span class="subtext">Re-roll on duplicates</span>
+              </div>
+              <div id="rulesList" class="rules-list"></div>
+            </div>
+
+            <div class="panel quick-stats">
+              <p class="label">Current password</p>
+              <code id="currentPwd">—</code>
+            </div>
+          </aside>
+        </div>
+      </section>
+
+      <!-- LOSE -->
+      <section id="losePage" class="page">
+        <div class="center-wrapper">
+          <div class="center-card lose-card">
+            <div class="lose-hero">
+              <div class="lose-icon" aria-hidden="true">💀</div>
+              <div>
+                <p class="eyebrow">Oof, timer hit zero</p>
+                <h1>Game Over</h1>
+                <p class="lead">Your run stats are safe—tweak the strategy and jump back in.</p>
+              </div>
+            </div>
+            <div class="lose-password">
+              <span class="label">Last password</span>
+              <code id="statLastPwd">—</code>
+            </div>
+            <div class="lose-stats">
+              <div class="stat-card">
+                <span class="stat-label">Total time</span>
+                <strong><b id="statTotalTime"></b> s</strong>
+              </div>
+              <div class="stat-card">
+                <span class="stat-label">Avg per level</span>
+                <strong><b id="statAvgTime"></b> s</strong>
+              </div>
+              <div class="stat-card">
+                <span class="stat-label">Level cleared</span>
+                <strong><b id="statLevel"></b></strong>
+              </div>
+            </div>
+            <button id="retryBtn" class="btn primary hero-btn">Retry</button>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- Login modal -->
+    <div id="loginModal" class="modal hidden" role="dialog" aria-modal="true">
+      <div class="modal-box login-card">
+        <div class="login-header">
+          <div class="login-avatar" aria-hidden="true">🔐</div>
+          <div>
+            <p class="eyebrow">Welcome Back</p>
+            <h3>Sync your streak</h3>
+          </div>
+            <button id="loginCloseBtn" class="close ghost-circle" aria-label="Close login form">×</button>
+        </div>
+        <p class="login-copy">Sign in with your arcade nickname to keep your wildest passwords tracked.</p>
+        <label class="sr-only" for="usernameInput">Username</label>
+        <input id="usernameInput" class="input vibe" placeholder="Username only" />
+        <button id="continueBtn" class="btn primary full">Continue</button>
+        <div class="login-footer">No account needed—finish one run and we’ll remember you.</div>
+      </div>
+    </div>
+  </div>
+
+  <div id="leaderboardModal" class="modal hidden" role="dialog" aria-modal="true">
+    <div class="modal-box leaderboard-card">
+      <div class="modal-head">
+        <div>
+          <p class="eyebrow">Global Stats</p>
+          <h3>Leaderboard</h3>
+        </div>
+        <div class="modal-head-actions">
+          <button id="leaderboardRefreshBtn" class="btn ghost sm">Refresh</button>
+          <button id="leaderboardCloseBtn" class="close ghost-circle" aria-label="Close leaderboard">×</button>
+        </div>
+      </div>
+      <div id="leaderboardSpinner" class="leaderboard-status">Loading runs…</div>
+      <div id="leaderboardError" class="leaderboard-status hidden"></div>
+      <div id="leaderboardEmpty" class="leaderboard-status hidden">No runs yet. Be the first!</div>
+      <div id="leaderboardList" class="leaderboard-list"></div>
+    </div>
+  </div>
+
+  <script type="module" src="./scripts/main.js"></script>
+</body>
 </html>

@@ -1,8 +1,10 @@
 import express from "express";
 import cors from "cors";
 
-import ItemRoute from "./routes/itemRoute.js";
-import MemberRoute from "./routes/memberRoute.js";
+import authRoutes from "./routes/authRoutes.js";
+import gameRoutes from "./routes/gameRoutes.js";
+import ruleRoutes from "./routes/ruleRoutes.js";
+import runRoutes from "./routes/runRoutes.js";
 
 const app = express();
 
@@ -13,8 +15,9 @@ app.use(express.urlencoded({ extended: true }));
 // allow request from other origin (Frontend which is at different port)
 app.use(cors());
 
-// use routes
-app.use("/items", ItemRoute);
-app.use("/members", MemberRoute);
+app.use("/api/auth", authRoutes);
+app.use("/api/game", gameRoutes);
+app.use("/api/rules", ruleRoutes);
+app.use("/api/runs", runRoutes);
 
 export default app;
