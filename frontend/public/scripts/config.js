@@ -1,4 +1,4 @@
-export const BASE_URL = "http://18.234.42.48:3222/api";
+export const BASE_URL = "http://54.197.187.177:3222/api";
 
 export const TOKEN_KEY = "pg_token";
 

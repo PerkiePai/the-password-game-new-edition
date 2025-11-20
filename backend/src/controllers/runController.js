@@ -1,4 +1,5 @@
 import History from "../models/historyModel.js";
+import User from "../models/userModel.js";
 
 function sanitizeNumber(value, min = 0) {
   const num = Number(value);
@@ -173,5 +174,23 @@ export async function deleteRun(req, res) {
   history.matches.splice(idx, 1);
   await history.save();
 
-  res.status(204).end();
+  const newHighestLevel = history.matches.reduce(
+    (max, match) => Math.max(max, Number(match.level) || 0),
+    0
+  );
+  const newLongestTime = history.matches.reduce(
+    (max, match) => Math.max(max, Number(match.totalTime) || 0),
+    0
+  );
+
+  const updatedUser = await User.findByIdAndUpdate(
+    req.user._id,
+    { highestLevel: newHighestLevel, longestTime: newLongestTime },
+    { new: true }
+  );
+
+  res.json({
+    highestLevel: updatedUser?.highestLevel ?? newHighestLevel,
+    longestTime: updatedUser?.longestTime ?? newLongestTime,
+  });
 }

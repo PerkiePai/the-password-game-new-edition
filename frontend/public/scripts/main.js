@@ -503,7 +503,11 @@ async function deleteHistoryEntry(matchId, triggerBtn) {
   }
 
   try {
-    await apiDeleteRun(matchId);
+    const stats = await apiDeleteRun(matchId);
+    if (stats?.highestLevel !== undefined) {
+      localStorage.setItem(LVL_KEY, Number(stats.highestLevel) || 0);
+      authUI.showBadge();
+    }
     await loadHistory(true);
   } catch (err) {
     console.error("Failed to delete history entry", err);

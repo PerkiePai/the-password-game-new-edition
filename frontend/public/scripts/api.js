@@ -69,10 +69,15 @@ export async function apiDeleteRun(id) {
     headers,
   });
 
-  if (r.status === 204) return true;
+  if (r.status === 204) return null;
   if (!r.ok) {
     const message = await r.text();
     throw new Error(message || "Unable to delete run");
   }
-  return true;
+
+  const contentType = r.headers.get("content-type") || "";
+  if (contentType.includes("application/json")) {
+    return r.json();
+  }
+  return null;
 }
